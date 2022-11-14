@@ -30,7 +30,7 @@ class Users(Base):
     username = Column(String(32), nullable=False, unique=True)
     pwd_hash = Column(String(128), nullable=False)
     #One to Many relationship, delete all children related to users.id in the TodoList table
-    children = relationship("TodoList", cascade="all, delete")
+    children = relationship("TodoLists", cascade="all, delete")
 
     def verify_pwd(self, pwd):
         #pwd hash is a normal python string so encode it to utf8
@@ -43,7 +43,7 @@ def hash_pwd(pwd):
     return bcrypt.hashpw(pwd.encode('utf8'), salt).decode('utf8')
 
 
-class TodoList(Base):
+class TodoLists(Base):
     __tablename__ = "todo_lists"
 
     id = Column(Integer, primary_key=True)
@@ -52,7 +52,16 @@ class TodoList(Base):
     title = Column(String(64), nullable=False)
     # shareable list
     public = Column(Boolean, nullable=False, default=False)
+    # One to many relationship, cascade on delete
+    children = relationship("TodoItems", cascade="all, delete")
 
+
+class TodoItems(Base):
+    __tablename__ = "todo_items"
+
+    id = Column(Integer, primary_key=True)
+    todo_list_id = Column(Integer, ForeignKey('todo_lists.id'), nullable=False)
+    body = Column(String(128), nullable=False)
 
 
 # tests
@@ -66,12 +75,16 @@ session.close()
 
 user1 = session.query(Users).filter(Users.username=="shubhushan").first()
 print(user1.id)
-todo1 = TodoList(user_id=user1.id, title="Groceries")
+todo1 = TodoLists(user_id=user1.id, title="Groceries")
 
 session.add(todo1)
 session.commit()
 session.close()
 
-session.delete(user1)
-session.commit()
+todo1 = session.query(TodoLists).filter(TodoLists.title == "Groceries").first()
+
+for i in range(10):
+    item = TodoItems(body="x", todo_list_id=todo1.id)
+    session.add(item)
+    session.commit()
 session.close()

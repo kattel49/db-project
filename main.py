@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, and_
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -67,24 +67,57 @@ class TodoItems(Base):
 # tests
 Base.metadata.create_all(engine)
 
-user1 = Users(username="shubhushan", pwd_hash=hash_pwd("shubhushan"))
+users_list = ["jon", "william", "skylar", "tina"]
 
-session.add(user1)
-session.commit()
-session.close()
+todo_lists = ["groceries", "library", "mathematics", "school"]
 
-user1 = session.query(Users).filter(Users.username=="shubhushan").first()
-print(user1.id)
-todo1 = TodoLists(user_id=user1.id, title="Groceries")
+item_dict = {
+    "groceries" : ["eggs", "bread", "cheese", "sausage"],
+    "library" : ["Biography", "Science Fiction", "Adventure"],
+    "mathematics" : ["calculus", "Linear Algebra", "Number Theory"],
+    "school" : ["Pen", "Notebook", "Pencil", "Eraser"]
+}
 
-session.add(todo1)
-session.commit()
-session.close()
 
-todo1 = session.query(TodoLists).filter(TodoLists.title == "Groceries").first()
-
-for i in range(10):
-    item = TodoItems(body="x", todo_list_id=todo1.id)
-    session.add(item)
+for user in users_list:
+    pwd = hash_pwd(user)
+    usr = Users(username=user, pwd_hash=pwd)
+    # add user to the database
+    session.add(usr)
     session.commit()
-session.close()
+
+    user_from_db = session.query(Users).filter(Users.username==user).first()
+    for list in todo_lists:
+        lst = TodoLists(user_id = user_from_db.id, title=list)
+        # add list to the database
+        session.add(lst)
+        session.commit()
+        list_from_db = session.query(TodoLists).filter(and_(TodoLists.title == list, TodoLists.user_id==user_from_db.id)).first()
+        # add items associated to the lists
+        for item in item_dict[list]:
+            itm = TodoItems(todo_list_id = list_from_db.id, body=item)
+            # add item to the database
+            session.add(itm)
+            session.commit()
+
+
+# delete a few items to check cascade
+tina = session.query(Users).filter(Users.username=="tina").first()
+
+tina_grocery = session.query(TodoLists).filter(and_(TodoLists.user_id == tina.id, TodoLists.title=="groceries")).first()
+
+session.delete(tina_grocery)
+session.commit()
+
+all_tina_lists = session.query(TodoLists).filter(TodoLists.user_id == tina.id)
+print("Lists of Tina:")
+for lst in all_tina_lists:
+    print("   "+lst.title)
+
+# delete user jon
+jon = session.query(Users).filter(Users.username == "jon").first()
+
+session.delete(jon)
+session.commit()
+
+print(session.query(Users).filter(Users.username=="jon").first())

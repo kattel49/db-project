@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine, Column, Integer, String, or_, and_
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 
 from dotenv import load_dotenv
@@ -29,6 +29,8 @@ class Users(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(32), nullable=False, unique=True)
     pwd_hash = Column(String(128), nullable=False)
+    #One to Many relationship, delete all children related to users.id in the TodoList table
+    children = relationship("TodoList", cascade="all, delete")
 
     def verify_pwd(self, pwd):
         #pwd hash is a normal python string so encode it to utf8
@@ -37,27 +39,39 @@ class Users(Base):
         return False
 
 def hash_pwd(pwd):
-    # databae will encode the hash to utf8, so first decode the string
+    # database will encode the hash to utf8, so first decode the string
     return bcrypt.hashpw(pwd.encode('utf8'), salt).decode('utf8')
 
 
 class TodoList(Base):
-    __tablename__ = "todo_list"
+    __tablename__ = "todo_lists"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False, ForeignKey=Users.id)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # title of the list
     title = Column(String(64), nullable=False)
+    # shareable list
+    public = Column(Boolean, nullable=False, default=False)
 
 
 
-
+# tests
 Base.metadata.create_all(engine)
 
 user1 = Users(username="shubhushan", pwd_hash=hash_pwd("shubhushan"))
 
 session.add(user1)
 session.commit()
+session.close()
 
-usr = session.query(Users).filter(Users.username=="shubhushan").first()
+user1 = session.query(Users).filter(Users.username=="shubhushan").first()
+print(user1.id)
+todo1 = TodoList(user_id=user1.id, title="Groceries")
 
-print(usr.verify_pwd("shubhushan"))
+session.add(todo1)
+session.commit()
+session.close()
+
+session.delete(user1)
+session.commit()
+session.close()
